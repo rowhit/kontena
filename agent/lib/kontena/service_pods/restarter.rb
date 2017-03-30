@@ -22,7 +22,7 @@ module Kontena
         service_container = get_container(self.service_id, self.instance_number)
         if service_container.running?
           info "restarting service: #{service_container.name}"
-          service_container.restart('timeout' => 10)
+          service_container.restart('timeout' => service_container.stop_grace_period)
         else
           info "service not running: #{service_container.name}"
           return

@@ -368,6 +368,27 @@ describe GridServices::Create do
       expect(outcome.success?).to be(true)
     end
 
+    it 'saves stop_grace_period' do
+      outcome = described_class.new(
+          grid: grid,
+          image: 'redis:2.8',
+          name: 'redis',
+          stateful: false,
+          stop_grace_period: '1m30s'
+      ).run
+      expect(outcome.result.stop_grace_period).to eq(90)
+    end
+
+    it 'saves stop_grace_period with default if not given' do
+      outcome = described_class.new(
+          grid: grid,
+          image: 'redis:2.8',
+          name: 'redis',
+          stateful: false
+      ).run
+      expect(outcome.result.stop_grace_period).to eq(10)
+    end
+
     context 'volumes' do
       let(:volume) do
         Volume.create!(grid: grid, name: 'foo', scope: 'node')

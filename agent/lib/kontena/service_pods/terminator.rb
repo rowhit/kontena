@@ -23,7 +23,7 @@ module Kontena
         service_container = get_container(self.service_id, self.instance_number)
         if service_container
           info "terminating service: #{service_container.name}"
-          service_container.stop('timeout' => 10)
+          service_container.stop('timeout' => service_container.stop_grace_period)
           service_container.wait
           service_container.delete(v: true)
         end

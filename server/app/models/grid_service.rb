@@ -37,6 +37,7 @@ class GridService
   field :revision, type: Fixnum, default: 1
   field :stack_revision, type: Fixnum
   field :strategy, type: String, default: 'ha'
+  field :stop_grace_period, type: Fixnum, default: 10
 
   belongs_to :grid
   belongs_to :image
@@ -98,7 +99,7 @@ class GridService
   def set_state(state)
     state_changed = self.state != state
     self.set(:state => state)
-    publish_update_event if state_changed    
+    publish_update_event if state_changed
   end
 
   # @return [Boolean]

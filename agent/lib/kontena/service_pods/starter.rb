@@ -22,7 +22,7 @@ module Kontena
         service_container = get_container(self.service_id, self.instance_number)
         unless service_container.running?
           info "starting service: #{service_container.name}"
-          service_container.restart('timeout' => 10)
+          service_container.restart('timeout' => service_container.stop_grace_period)
         end
 
         Celluloid::Notifications.publish('service_pod:start', service_container)

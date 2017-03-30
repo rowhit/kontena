@@ -7,7 +7,7 @@ describe Kontena::ServicePods::Stopper do
   describe '#perform' do
 
     let(:container) do
-      double(:container, :running? => true, :name => '/foo')
+      double(:container, :running? => true, :name => '/foo', :stop_grace_period => 10)
     end
 
     before(:each) do
@@ -16,6 +16,12 @@ describe Kontena::ServicePods::Stopper do
 
     it 'stops container' do
       expect(container).to receive(:stop).with({'timeout' => 10})
+      subject.perform
+    end
+
+    it 'stops container with a configured timeout' do
+      expect(container).to receive(:stop_grace_period).and_return(20)
+      expect(container).to receive(:stop).with({'timeout' => 20})
       subject.perform
     end
   end
