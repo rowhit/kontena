@@ -44,7 +44,7 @@ module Stacks
           volume_name = volume['external'] == true ? volume['name'] : volume.dig('external', 'name')
           vol = self.grid.volumes.where(name: volume_name, grid: self.grid).first
           unless vol
-            add_error(:volumes, :not_found, "External volume #{volume_name} not found")
+            add_error("volumes.#{volume['name']}", :not_found, "External volume #{volume_name} not found")
           end
         else
           outcome = Volumes::Create.validate(grid: self.grid, **volume.symbolize_keys)
