@@ -18,7 +18,6 @@ module Kontena::Workers
     def initialize(autostart = true)
       @node = nil
       @workers = {}
-
       async.start if autostart
     end
 
@@ -31,6 +30,7 @@ module Kontena::Workers
       populate_workers_from_docker
 
       subscribe('service_pod:update', :on_update_notify)
+      subscribe('service_pod:event', :on_pod_event)
       every(30) do
         populate_workers_from_master
       end
@@ -40,12 +40,19 @@ module Kontena::Workers
       populate_workers_from_master
     end
 
+    def on_pod_event(_, event)
+      rpc_client.async.notification("/node_service_pods/event", [node.id, event])
+    rescue => exc
+      error "sending event to master failed: #{exc.message}"
+    end
+
     def populate_workers_from_master
       exclusive {
-        request = rpc_client.future.request("/node_service_pods/list", [node.id])
-        response = request.value
+        response = rpc_request("/node_service_pods/list", [node.id])
+
+        # sanity-check
         unless response['service_pods'].is_a?(Array)
-          warn "failed to get list of service pods from master: #{response['error']}"
+          error "Invalid response from master: #{response}"
           return
         end
 
@@ -57,6 +64,8 @@ module Kontena::Workers
           ensure_service_worker(Kontena::Models::ServicePod.new(s))
         end
       }
+    rescue Kontena::RpcClient::Error => exc
+      warn "failed to get list of service pods from master: #{exc}"
     end
 
     def populate_workers_from_docker
@@ -65,6 +74,7 @@ module Kontena::Workers
         service_pod = Kontena::Models::ServicePod.new(
           'id' => "#{c.service_id}/#{c.instance_number}",
           'service_id' => c.service_id,
+          'service_name' => c.service_name,
           'instance_number' => c.instance_number,
           'desired_state' => 'unknown'
         )
@@ -102,11 +112,11 @@ module Kontena::Workers
           worker = ServicePodWorker.new(node, service_pod)
           self.link worker
           workers[service_pod.id] = worker
-          worker.ensure_desired_state
+          worker.async.apply
         else
           workers[service_pod.id].async.update(service_pod)
         end
-      rescue Celluloid::DeadActorError => exc
+      rescue Celluloid::DeadActorError
         workers.delete(service_pod.id)
       end
     end

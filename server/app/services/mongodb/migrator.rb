@@ -7,11 +7,17 @@ module Mongodb
     include Logging
     include DistributedLocks
 
-    class MigratorError < StandardError; end
+    MigratorError = Class.new(StandardError)
 
     class DuplicateMigrationNameError < MigratorError
       def initialize(name)
         super("Multiple migrations have the name #{name}")
+      end
+    end
+
+    class DuplicateMigrationVersionError < MigratorError
+      def initialize(version)
+        super("Multiple migrations have the version #{version}")
       end
     end
 

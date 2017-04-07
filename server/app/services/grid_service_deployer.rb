@@ -4,7 +4,7 @@ require_relative 'grid_service_scheduler'
 class GridServiceDeployer
   include Logging
 
-  class DeployError < StandardError; end
+  DeployError = Class.new(StandardError)
 
   attr_reader :grid_service_deploy,
               :grid_service,
@@ -41,6 +41,7 @@ class GridServiceDeployer
 
   def deploy
     info "starting to deploy #{self.grid_service.to_path}"
+    log_service_event("service #{self.grid_service.to_path} deploy started")
     self.grid_service_deploy.set(:deploy_state => :ongoing)
     deploy_rev = Time.now.utc.to_s
     self.grid_service.set(:deployed_at => deploy_rev)
@@ -59,21 +60,25 @@ class GridServiceDeployer
     deploy_futures.select{|f| !f.ready?}.each{|f| f.value }
 
     self.grid_service_deploy.set(finished_at: Time.now.utc, :deploy_state => :success)
+    log_service_event("service #{self.grid_service.to_path} deployed")
     info "service #{self.grid_service.to_path} has been deployed"
 
     true
   rescue DeployError => exc
     error exc.message
+    log_service_event("deploy of #{self.grid_service.to_path} errored: #{exc.message}", EventLog::ERROR)
     self.grid_service_deploy.set(:deploy_state => :error, :reason => exc.message)
     false
   rescue RpcClient::Error => exc
     error "Rpc error (#{self.grid_service.to_path}): #{exc.class.name} #{exc.message}"
     error exc.backtrace.join("\n") if exc.backtrace
+    log_service_event("agent communication error while deploying #{self.grid_service.to_path}: #{exc.message}", EventLog::ERROR)
     self.grid_service_deploy.set(:deploy_state => :error, :reason => exc.message)
     false
   rescue => exc
     error "Unknown error (#{self.grid_service.to_path}): #{exc.class.name} #{exc.message}"
     error exc.backtrace.join("\n") if exc.backtrace
+    log_service_event("unknown error while deploying #{self.grid_service.to_path}: #{exc.message}", EventLog::ERROR)
     self.grid_service_deploy.set(:deploy_state => :error, :reason => exc.message)
     false
   ensure
@@ -94,10 +99,14 @@ class GridServiceDeployer
       raise DeployError, "Cannot find applicable node for service instance #{self.grid_service.to_path}-#{instance_number}: #{exc.message}"
     end
 
-    info "deploying service instance #{self.grid_service.to_path}-#{instance_number} to node #{node.name}"
+    grid_service_instance_deploy = @grid_service_deploy.grid_service_instance_deploys.create(
+      instance_number: instance_number,
+      host_node: node,
+    )
+
     deploy_futures << Celluloid::Future.new {
-      instance_deployer = GridServiceInstanceDeployer.new(self.grid_service)
-      instance_deployer.deploy(node, instance_number, deploy_rev)
+      instance_deployer = GridServiceInstanceDeployer.new(grid_service_instance_deploy)
+      instance_deployer.deploy(deploy_rev)
     }
     pending_deploys = deploy_futures.select{|f| !f.ready?}
     if pending_deploys.size >= (total_instances * self.min_health).floor || pending_deploys.size >= 20
@@ -131,5 +140,17 @@ class GridServiceDeployer
   # @return [Float]
   def min_health
     1.0 - (self.grid_service.deploy_opts.min_health || 0.8).to_f
+  end
+
+  # @param [String] reason
+  # @param [String] msg
+  def log_service_event(msg, severity = EventLog::INFO)
+    EventLog.create(
+      grid_id: self.grid_service.grid_id,
+      grid_service_id: self.grid_service.id,
+      msg: msg,
+      severity: severity,
+      type: 'service:deploy'.freeze
+    )
   end
 end
