@@ -70,7 +70,8 @@ module Kontena
           'Kontena-Grid-Token' => self.api_token.to_s,
           'Kontena-Node-Id' => host_id.to_s,
           'Kontena-Version' => Kontena::Agent::VERSION,
-          'Kontena-Node-Labels' => labels
+          'Kontena-Node-Labels' => labels,
+          'Kontena-Connected-At' => Time.now.utc.to_s,
       }
       @ws = Faye::WebSocket::Client.new(self.api_uri, nil, {headers: headers})
 
