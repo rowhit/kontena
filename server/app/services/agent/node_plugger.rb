@@ -9,9 +9,11 @@ module Agent
 
     # @param [Grid] grid
     # @param [HostNode] node
-    def initialize(grid, node)
+    # @param [String] connected_at
+    def initialize(grid, node, connected_at)
       @grid = grid
       @node = node
+      @connected_at = connected_at
     end
 
     # @return [Celluloid::Future]
@@ -31,7 +33,15 @@ module Agent
     end
 
     def update_node
-      node.set(connected: true, last_seen_at: Time.now.utc)
+      result = HostNode.where(:id => node.id).any_of(
+        {:connected_at => nil}, {:connected_at.lt => @connected_at}
+      ).update(connected: true, last_seen_at: Time.now.utc, connected_at: @connected_at)
+
+      if result['updatedExisting']
+        info "Plugged node #{@node.to_path} at #{@connected_at}"
+      else
+        warn "Not plugging re-connected node #{@node.to_path} at #{@connected_at}"
+      end
     end
 
     def publish_update_event

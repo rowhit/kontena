@@ -74,17 +74,20 @@ class WebsocketBackend
 
       node = grid.host_nodes.find_by(node_id: node_id)
       labels = req.env['HTTP_KONTENA_NODE_LABELS'].to_s.split(',')
+      connected_at = req.env['HTTP_KONTENA_CONNECTED_AT'].to_s
+
       unless node
         node = grid.host_nodes.create!(node_id: node_id, labels: labels)
       end
 
-      node_plugger = Agent::NodePlugger.new(grid, node)
+      node_plugger = Agent::NodePlugger.new(grid, node, connected_at)
       client = {
           ws: ws,
           id: node_id.to_s,
           node_id: node.id,
           grid_id: grid.id,
-          created_at: Time.now
+          created_at: Time.now,
+          connected_at: connected_at,
       }
       @clients << client
 
@@ -199,7 +202,7 @@ class WebsocketBackend
   def unplug_client(client)
     node = HostNode.find_by(node_id: client[:id])
     if node
-      Agent::NodeUnplugger.new(node).unplug!
+      Agent::NodeUnplugger.new(node, client[:connected_at]).unplug!
     else
       logger.warn "skip unplug of missing node #{client[:id]}"
     end
