@@ -33,6 +33,7 @@ module Kontena::Workers
 
     def ensure_dns(topic, data)
       info 'ensuring existing containers have proper DNS names'
+      count = 0
       Docker::Container.all(all: true).each do |container|
         begin
           overlay_cidr = container.overlay_cidr
@@ -40,17 +41,18 @@ module Kontena::Workers
             wait_weave_running?
 
             register_container_dns(container)
+            count += 1
           else
             debug "skip DNS for container=#{container.name} without overlay_cidr"
           end
         rescue Docker::Error::NotFoundError
           debug "skip DNS for missing container=#{container.id}"
-
         rescue => exc
           error "failed to ensure container DNS: #{exc.class.name}: #{exc.message}"
           error exc.backtrace.join("\n")
         end
       end
+      info "ensured #{count} containers"
     end
 
     def start
