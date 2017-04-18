@@ -48,18 +48,20 @@ module Kontena::Workers
     # @param [String] topic
     # @param [Docker::Event] event
     def on_container_event(topic, event)
-      if event.status == 'start'
+      if network_adapter.router_image?(event.from)
+        if event.status == 'start' || event.status == 'restart'
+          info "Restart after weave restart"
+
+          wait_weave_running?
+
+          self.start
+        end
+      elsif event.status == 'start'
         container = Docker::Container.get(event.id) rescue nil
         if container
           self.start_container(container)
         else
           warn "skip start event for missing container=#{event.id}"
-        end
-      elsif event.status == 'restart'
-        if network_adapter.router_image?(event.from)
-          wait_weave_running?
-
-          self.start
         end
       elsif event.status == 'destroy'
         self.on_container_destroy(event)
