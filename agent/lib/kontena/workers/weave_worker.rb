@@ -45,13 +45,6 @@ module Kontena::Workers
       add_dns(event[:id], event[:ip], event[:name])
     end
 
-    # Was container event from the weave router?
-    def router_image?(image)
-      image.to_s == "#{Kontena::NetworkAdapters::Weave::WEAVE_IMAGE}:#{Kontena::NetworkAdapters::Weave::WEAVE_VERSION}"
-    rescue
-      false
-    end
-
     # @param [String] topic
     # @param [Docker::Event] event
     def on_container_event(topic, event)
